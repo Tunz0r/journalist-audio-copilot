@@ -37,6 +37,18 @@ context = st.text_area(
 process = st.button("Process", type="primary", disabled=audio_file is None)
 
 
+MAX_WHISPER_BYTES = 25 * 1024 * 1024  # 25 MB Whisper limit
+
+
+def _compress_audio(tmp_path: str) -> str:
+    """Re-encode audio as 64kbps mono mp3 to fit under the Whisper size limit."""
+    from pydub import AudioSegment
+    audio = AudioSegment.from_file(tmp_path)
+    compressed_path = tmp_path + ".mp3"
+    audio.export(compressed_path, format="mp3", parameters=["-ac", "1", "-b:a", "64k"])
+    return compressed_path
+
+
 # ── Helper: transcribe audio via Whisper ─────────────────────────────────────
 def transcribe_audio(audio_file) -> dict:
     """Send audio to OpenAI Whisper and return the verbose JSON response."""
@@ -47,6 +59,13 @@ def transcribe_audio(audio_file) -> dict:
         tmp_path = tmp.name
 
     try:
+        # Compress if file exceeds Whisper's 25 MB limit
+        if os.path.getsize(tmp_path) > MAX_WHISPER_BYTES:
+            st.info("File exceeds 25 MB — compressing audio…")
+            compressed = _compress_audio(tmp_path)
+            os.unlink(tmp_path)
+            tmp_path = compressed
+
         with open(tmp_path, "rb") as f:
             response = client.audio.transcriptions.create(
                 model="whisper-1",
