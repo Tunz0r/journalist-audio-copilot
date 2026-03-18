@@ -10,6 +10,13 @@ import tempfile
 import os
 from openai import OpenAI
 
+# ── OpenAI client (reads key from Streamlit secrets or env var) ──────────────
+api_key = st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY"))
+if not api_key:
+    st.error("Missing OpenAI API key. Add it to .streamlit/secrets.toml or set the OPENAI_API_KEY environment variable.")
+    st.stop()
+client = OpenAI(api_key=api_key)
+
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Journalist Audio Copilot", page_icon="🎙️", layout="wide")
 
@@ -33,8 +40,6 @@ process = st.button("Process", type="primary", disabled=audio_file is None)
 # ── Helper: transcribe audio via Whisper ─────────────────────────────────────
 def transcribe_audio(audio_file) -> dict:
     """Send audio to OpenAI Whisper and return the verbose JSON response."""
-    client = OpenAI()  # uses OPENAI_API_KEY env var
-
     # Write uploaded file to a temp file (Whisper API needs a file path)
     suffix = os.path.splitext(audio_file.name)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -87,7 +92,6 @@ Be specific, critical, and avoid generic phrasing."""
 # ── Helper: run LLM analysis ────────────────────────────────────────────────
 def analyze_transcript(transcript: str, context: str) -> str:
     """Send transcript + context to GPT-4o and return the analysis."""
-    client = OpenAI()
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": build_prompt(transcript, context)}],
