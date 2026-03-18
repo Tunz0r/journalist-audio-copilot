@@ -7,6 +7,7 @@ Requires: pip install streamlit openai
 
 import streamlit as st
 import tempfile
+import subprocess
 import os
 from openai import OpenAI
 
@@ -41,11 +42,12 @@ MAX_WHISPER_BYTES = 25 * 1024 * 1024  # 25 MB Whisper limit
 
 
 def _compress_audio(tmp_path: str) -> str:
-    """Re-encode audio as 64kbps mono mp3 to fit under the Whisper size limit."""
-    from pydub import AudioSegment
-    audio = AudioSegment.from_file(tmp_path)
+    """Re-encode audio as 64kbps mono mp3 using ffmpeg directly (no pydub)."""
     compressed_path = tmp_path + ".mp3"
-    audio.export(compressed_path, format="mp3", parameters=["-ac", "1", "-b:a", "64k"])
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", tmp_path, "-ac", "1", "-b:a", "64k", compressed_path],
+        check=True, capture_output=True,
+    )
     return compressed_path
 
 
